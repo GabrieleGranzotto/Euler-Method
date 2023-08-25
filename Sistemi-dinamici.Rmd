@@ -1,0 +1,2264 @@
+---
+title: "Progetto per l'esame di Sistemi Dinamici"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+date: "Gabriele Granzotto, Sara Trabucco"
+---
+
+```{r setup, include=FALSE}
+library(knitr)  
+library(reticulate)  
+use_python('/Users/sarat/AppData/Local/Programs/Python/Python311/')
+knitr::knit_engines$set(python = reticulate::eng_python)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{python, echo=FALSE, message=FALSE}
+import matplotlib.pyplot as plt
+import numpy as np
+from numpy.linalg import eig
+
+def euler_method_2d(initial_time, final_time, initial_value, delta_time, modified=False):
+    time = initial_time
+    result1 = initial_value[0]
+    result2 = initial_value[1]
+    elements = round((final_time - initial_time)/delta_time)
+    
+    time_vector = np.empty(elements)
+    result1_vector = np.empty(elements)
+    result2_vector = np.empty(elements)
+
+    
+    for i in range(elements):
+        time_vector[i] = time
+        result1_vector[i] = result1
+        result2_vector[i] = result2
+        
+        time += delta_time
+
+        if modified:
+            fake_result1 = chosen_function(result1, result2, time)[0]*delta_time + result1
+            result1 += (chosen_function(result1, result2, time)[0]+chosen_function(fake_result1, result2, time)[0])*delta_time/2
+            
+            fake_result2 = chosen_function(result1, result2, time)[1]*delta_time + result2
+            result2 += (chosen_function(result1, result2, time)[1]+chosen_function(result1, fake_result2, time)[1])*delta_time/2
+        else:
+            result1 += chosen_function(result1, result2, time)[0]*delta_time
+            result2 += chosen_function(result1, result2, time)[1]*delta_time
+     
+        
+    return time_vector, result1_vector, result2_vector
+```
+
+## *Conigli contro pecore*
+
+Si consideri il sistema dinamico:
+
+$$
+\begin{split} \dot{x} &=x(3-ax-by) \\ \dot{y} & = y(2-x-y) \end{split}
+$$
+
+che rappresenta la competizione per le stesse risorse di una popolazione di conigli x e di pecore y.
+
+$a > 0$ è l'inverso della capacità portante dell'ambiente per i conigli e $b > 0$ il coefficiente di competizione dei conigli con le pecore.
+
+In particolare si consideri il caso $a=2$ e $b=1$.
+
+• **Determinare i punti fissi e studiarne la stabilità**.
+
+• **Tracciare le isocline**.
+
+• **Studiare numericamente il campo vettoriale**.
+
+• **Linearizzare il flusso intorno ai punti fissi e tracciare numericamente alcune orbite intorno ai punti fissi**.
+
+• **Individuare le varietà lineari stabile e instabile vicino ai punti fissi**.
+
+• **Studiare numericamente l'estensione nonlineare delle varietà stabili e instabili**.
+
+Usando il codice numerico, si studi cosa succede al variare di a e di b nell'intervallo $1 < a < 3$, $1 < b < 3$.
+
+<hr>
+
+<br>
+
+#### *Per cominciare, si vogliono determinare i punti fissi e le relative stabilità*
+
+Fissati $a=2, b=1$, il sistema dinamico sarà:
+
+$$
+\begin{split} \dot{x} &=x(3-2x-y) \\ \dot{y} & = y(2-x-y) \end{split}
+$$
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+def chosen_function(x, y, t=1):
+    function1 = x*(3-2*x-y)
+    function2 = y*(2-x-y)
+    return function1, function2
+```
+
+I punti fissi del sistema sono $(0,0)$, $(0,2)$, $(0,\frac{2}{3})$, $(1,1)$; per studiarne la stabilità, bisogna considerare la jacobiana del sistema...
+
+$$J=\begin{bmatrix}3-4x-y &-x \\ -y &2-2y-x \end{bmatrix}$$
+
+...per poi considerare il flusso linearizzato in ogni punto fisso:
+
+<br>
+
+$$
+J \big|_{\small(0,0)}=\begin{bmatrix} 3 &0 \\ 0 &2 \end{bmatrix}
+$$
+
+$\tau=tr(J)=3+2=5>0$
+
+$\Delta=det(J)=3 \cdot 2=6>0$
+
+Il punto potrebbe essere un *nodo instabile* oppure una *spirale espandente*; per verificarlo, bisogna calcolare gli autovalori. Essendo la matrice diagonale, gli autovalori saranno gli elementi diagonali, quindi $\ \ \lambda_1 =3,\  \lambda_2 =2$
+
+Essendo entrambi numeri reali puri, il punto fisso $A(0,0)$ è un **nodo instabile**.
+
+<br>
+
+$$
+J \big|_{\small(0,2)}=\begin{bmatrix} -3 &-\frac{3}2 \\ 0 &\frac{1}2 \end{bmatrix}
+$$
+
+$\tau=tr(J)=1+(-2)=-1<0$
+
+$\Delta=det(J)=1 \cdot (-2)=-2<0$
+
+Il punto fisso $B(0,2)$ è un **punto di sella** e gli autovalori della matrice, essendo essa triangolare, sono $\lambda_1=1,\ \lambda_2=-2$.
+
+<br>
+
+$$
+J \big|_{\small(\frac{3}2,0)}=\begin{bmatrix} -3 &-\frac{3}2 \\ 0 &\frac{1}2 \end{bmatrix}
+$$
+
+$\tau=tr(J)=-3+\frac{1}{2}=-\frac{5}{2}<0$
+
+$\Delta=det(J)=-3 \cdot \frac{1}{2}=-\frac{3}{2}<0$
+
+Il punto fisso $C(\frac{3}{2},0)$ è un **punto di sella** e gli autovalori sono $\lambda_1=-3,\ \lambda_2=\frac{1}{2}$.
+
+<br>
+
+$$
+J \big|_{\small(1,1)}=\begin{bmatrix} -2 &-1 \\ -1 &-1 \end{bmatrix}
+$$
+
+$\tau=tr(J)=-2+(-1)=-3<0$
+
+$\Delta=det(J)=-2 \cdot (-1) - (-1) \cdot (-1)=1 >0$
+
+Dato che $\tau<0$ e $\Delta >0$ , il punto fisso potrebbe essere un *nodo stabile* oppure una *spirale contraente*. Bisogna calcolare allora gli autovalori:
+
+$$\lambda_{1,2}=\frac{\tau \pm \sqrt{ \tau^2 - 4 \Delta}}{2}=\frac{3 \pm \sqrt{ 3^2 - 4 \cdot 1}}{2} $$
+
+$$ \Rightarrow \lambda_1 = \frac{-3+\sqrt{5}}{2},\ \ \lambda_2 = \frac{-3-\sqrt{5}}{2}$$ Dato che sono entrambi numeri reali puri, il punto fisso $D(1,1)$ è un **nodo stabile**.
+
+```{python,echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def parabola(x):
+    return (x**2)/4
+x = np.linspace(-20, 20, 100)
+assi = np.zeros(100)
+
+plt.grid()
+plt.xlim(-4, 7.5)
+plt.ylim(-7, 7)
+
+plt.title("Studio Natura Punti Fissi", color="red")
+plt.plot(parabola(x), x, color="orange")
+
+plt.plot(assi, x, color="black")
+plt.plot(x, assi, color="black")
+
+plt.text(6, 5.5, 'A(0,0)')
+plt.plot(6, 5, marker='x', markersize=8, color='blue')
+plt.text(-1, -1.5, 'B(0, 2)')
+plt.plot(-1, -2, marker='x', markersize=8, color='blue')
+plt.text(-5/2, -3.8, 'C(3/2, 0)')
+plt.plot(-5/2, -3, marker='x', markersize=8, color='blue')
+plt.text(1, -3.8, 'D(1, 1)')
+plt.plot(1, -3, marker='x', markersize=8, color='blue')
+
+plt.show()
+```
+
+I punti B e C si trovano nella regione dei **punti di sella**, il punto D si trova nella regione dei **nodi stabili** o **contraenti** mentre il punto A, sebbene si trovi quasi sulla parabola (ed in effetti sembra avere un comportamento simile ad una **stella**), in realtà risulta essere un nodo **instabile** o **espandente**.
+
+<br>
+
+Per valutare il comportamento del campo vettoriale, vale la pena considerare le **isocline**. Le equazioni delle isocline saranno:
+
+$y=0, \ \ y=-2x+3$, che hanno la componente x nulla
+
+$x=0, \ \ x=-y+2$, che hanno la componente y nulla
+
+<br>
+
+#### *Perché sono importanti le isocline?*
+
+Lungo le isocline la direzione del campo vettoriale del sistema sarà sempre la stessa (ossia le curve integrali o traiettorie intersecano le isocline sempre con la stessa inclinazione) ed il loro punto di intersezione è un punto fisso, infatti:
+
+```{python,  echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+a = 2
+b = 1
+
+def isoclina1(x):
+    return (3 - a*x)/b
+
+def isoclina2(x):
+    return 2-x
+
+x = np.linspace(-1, 3, 30)
+vettore_zero = np.zeros(30)
+
+plt.title("Isocline e Punti Fissi", color="red")
+plt.ylim(-.1, 3)
+plt.xlim(-.1, 3)
+
+plt.plot(x, isoclina1(x), color='red')
+plt.plot(vettore_zero, x, color='red')
+plt.plot(x, isoclina2(x), color='blue')
+plt.plot(x, vettore_zero, color='blue')
+
+punto_fisso1_x = 0
+punto_fisso1_y = 0
+
+punto_fisso2_x = 0
+punto_fisso2_y = 2
+
+punto_fisso3_x = 3/a
+punto_fisso3_y = 0
+
+punto_fisso4_x = (2*b-3)/(b-a)
+punto_fisso4_y = (3-2*a)/(b-a)
+
+plt.plot(punto_fisso1_x, punto_fisso1_y, marker='o', markersize=10, color='green')
+plt.plot(punto_fisso2_x, punto_fisso2_y, marker='o', markersize=10, color='green')
+plt.plot(punto_fisso3_x, punto_fisso3_y, marker='o', markersize=10, color='green')
+plt.plot(punto_fisso4_x, punto_fisso4_y, marker='o', markersize=10, color='green')
+
+for points in range(4):
+    before_points = points/4
+    plt.quiver(before_points,isoclina1(before_points), 0,-1, color="red", width = 0.006)
+    after_points = points/4 + 5/4
+    plt.quiver(after_points,isoclina1(after_points), 0,1, color="red", width = 0.006)
+
+for points in range(3):
+    before_points = points/3
+    plt.quiver(before_points,isoclina2(before_points), 1, 0, color="blue", width = 0.006)
+    after_points = points/3 + 4/3
+    plt.quiver(after_points,isoclina2(after_points), -1, 0, color="blue", width = 0.006)
+    
+for points in range(3):
+    before_points = points/2
+    plt.quiver(before_points, 0, 1, 0, color="blue", width = 0.006)
+    after_points = points/2 + 2
+    plt.quiver(after_points,0, -1, 0, color="blue", width = 0.006)
+    
+for points in range(3):
+    before_points = points/1.5
+    plt.quiver(0, before_points, 0, 1, color="red", width = 0.006)
+    after_points = points/2 + 2.5
+    plt.quiver(0,after_points, 0, -1, color="red", width = 0.006)
+
+
+plt.grid() 
+plt.show()
+```
+
+Per studiare in modo numerico la funzione è sempre meglio partire con una rappresentazione sul campo vettoriale in modo da darci una rappresentazione grezza del comportamento delle equazioni sul piano:
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+initial_value_start = 0.1
+initial_value_stop = 3
+value_step = 0.2
+
+delta_time = 5
+for i in np.arange(initial_value_start, initial_value_stop, value_step):
+    for j in np.arange(initial_value_start, initial_value_stop, value_step):
+        plt.quiver(i, j, chosen_function(i,j,1)[0]*delta_time + i, chosen_function(i,j,1)[1]*delta_time + j, width=0.0028)
+        
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3/2, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(1, 1, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+#plt.xlim(-0.1,4)
+#plt.ylim(-0.1,4)
+
+plt.title("Campo Vettoriale", color="red")
+
+plt.show()
+```
+
+<br>
+
+<br>
+
+#### *Cosa succede invece alle traiettorie intorno ai punti fissi?*
+
+Dall'analisi del sistema sono stati trovati quattro punti fissi, di cui un nodo instabile in $A(0,0)$, uno stabile in $D(1,1)$ e due punti di sella in $B(0,2)$ e $C(\frac{3}2, 0)$.
+
+Per una visione più generale di cosa succede al campo vettoriale in un loro intorno, si considerano i rispettivi manifold stabili e instabili:
+
+-   $A(0,0)$ è un **nodo instabile**, quindi gli autovalori sono entrambi reali positivi e si hanno due **manifold instabili**; le autodirezioni saranno $(1,0)$ e $(0,1)$ e saranno entrambe *espandenti*:
+
+<br>
+
+-   $B(0,2)$ è un **punto di sella** ed ha un autovalore positivo ed uno negativo; le autodirezioni sono $(0, 1)$ e $(3, -2)$, rispettivamente *contraente* ed *espandente*:
+
+<br>
+
+-   $C(\frac{3}{2},0)$ è a sua volta un **punto di sella**, anche qui gli autovalori sono reali di segno opposto; le autodirezioni saranno $(-\frac{3}7,1)$ e $(1,0)$, la prima *contraente* e la seconda *espandente*:
+
+<br>
+
+-   $D(1,1)$ è un **nodo stabile**, con i rispettivi autovalori entrambi reali negativi, si avranno quindi due manifold entrambi *contraenti*; le autodirezioni sono $(\frac{1+\sqrt5}2,1)$ e $(\frac{1-\sqrt5}2,1)$:
+
+Si può osservare inoltre che il manifold riferito all'autovalore $\lambda_2 = \frac{-3-\sqrt{5}}{2}$ contrae più velocemente rispetto all'altro.
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+initial_time = 0
+final_time = 50
+delta_time = 0.01
+
+initial_value_start = 0.1
+initial_value_stop = 3
+value_step = 0.2
+
+plt.text(0.02, 0.1, 'A(0,0)')
+plt.plot(0,0, marker='o', markersize=8, color='blue')
+
+plt.text(0.02, 2.1, 'B(0,2)')
+plt.plot(0,2, marker='o', markersize=8, color='red')
+
+plt.text(3/2+0.02, 0.1, 'C(3/2,0)')
+plt.plot(3/2,0, marker='o', markersize=8, color='green')
+
+plt.text(1, 1.15, 'D(1,1)')
+plt.plot(1,1, marker='o', markersize=8, color='orange')
+
+
+plt.plot([-.2,.2],[0,0], color='blue')
+plt.plot([0,0],[-.2,.2], color='blue')
+
+plt.plot([0,0],[2+.2,2-.2], color='red')
+plt.plot([-.1,.1],[2+2/30,2-2/30], color='red')
+
+plt.plot([3/2 -.2,3/2 +.2],[0,0], color='green')
+plt.plot([3/2 -.1,3/2 +.1],[7/30,-7/30], color='green')
+
+plt.plot([1-(1-np.sqrt(5))/2*.2, 1+(1-np.sqrt(5))/2*.2],[1-.2, 1+.2], color='orange')
+plt.plot([1-(1+np.sqrt(5))/2*.1, 1+(1+np.sqrt(5))/2*.1],[1-.1, 1+.1], color='orange')
+
+
+plt.xlim(-.1,2.5)
+plt.xlim(-.1,2)
+plt.title("Punti Fissi e Manifold", color="red")
+
+plt.grid()
+plt.show()
+```
+
+<br>
+
+Graficamente, alcune traiettorie intorno ai punti fissi saranno:
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+plt.plot(0, 0, marker=".", markersize=10, color="blue")
+plt.plot(0, 2, marker=".", markersize=10, color="red")
+plt.plot(3/2, 0, marker=".", markersize=10, color="green")
+plt.plot(1, 1, marker=".", markersize=10, color="orange")
+
+################
+
+plt.plot([-.2,.2],[0,0], color='blue')
+plt.plot([0,0],[-.2,.2], color='blue')
+
+plt.plot([0,0],[2+.2,2-.2], color='red')
+plt.plot([-.1,.1],[2+2/30,2-2/30], color='red')
+
+plt.plot([3/2 -.2,3/2 +.2],[0,0], color='green')
+plt.plot([3/2 -.1,3/2 +.1],[7/30,-7/30], color='green')
+
+plt.plot([1-(1-np.sqrt(5))/2*.2, 1+(1-np.sqrt(5))/2*.2],[1-.2, 1+.2], color='orange')
+plt.plot([1-(1+np.sqrt(5))/2*.1, 1+(1+np.sqrt(5))/2*.1],[1-.1, 1+.1], color='orange')
+
+
+plt.xlim(-0.1,4)
+plt.ylim(-0.1,4)
+
+plt.title("Manifold e Traiettorie", color="red")
+
+plt.grid()
+plt.show()
+```
+
+<br>
+
+<br>
+
+#### *Ma cosa succede estendendo i manifold dei due punti di sella, del nodo instabile e di quello stabile?*
+
+La linea viola rappresenta l'estensione non lineare:
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 50
+delta_time = 0.01
+
+initial_value_start = 0.1
+initial_value_stop = 3
+value_step = 0.2
+
+times, x, y = euler_method_2d(initial_time, final_time, (0, 0.01), delta_time, modified=True)
+plt.plot(x, y, color="purple")
+times, x, y = euler_method_2d(initial_time, final_time, (0.01, 0), delta_time, modified=True)
+plt.plot(x, y, color="purple")
+times, x, y = euler_method_2d(initial_time, final_time, (0.01, 0.051), delta_time, modified=True)
+plt.plot(x, y, color="purple")
+times, x, y = euler_method_2d(initial_time, final_time, (0.01, 1.98), delta_time, modified=True)
+plt.plot(x, y, color="purple")
+times, x, y = euler_method_2d(initial_time, final_time, (3/2+0.01, 0.01), delta_time, modified=True)
+plt.plot(x, y, color="purple")
+
+
+plt.plot(0,0, marker='o', markersize=8, color='blue')
+plt.plot(0,2, marker='o', markersize=8, color='red')
+plt.plot(3/2,0, marker='o', markersize=8, color='green')
+plt.plot(1,1, marker='o', markersize=8, color='orange')
+
+
+plt.plot([-.2,.2],[0,0], color='blue')
+plt.plot([0,0],[-.2,.2], color='blue')
+
+plt.plot([0,0],[2+.2,2-.2], color='red')
+plt.plot([-.1,.1],[2+2/30,2-2/30], color='red')
+
+plt.plot([3/2 -.2,3/2 +.2],[0,0], color='green')
+plt.plot([3/2 -.1,3/2 +.1],[7/30,-7/30], color='green')
+
+plt.plot([1-(1-np.sqrt(5))/2*.2, 1+(1-np.sqrt(5))/2*.2],[1-.2, 1+.2], color='orange')
+plt.plot([1-(1+np.sqrt(5))/2*.1, 1+(1+np.sqrt(5))/2*.1],[1-.1, 1+.1], color='orange')
+
+
+plt.xlim(-.1,4)
+plt.xlim(-.1,4)
+
+plt.title("Estensione Nonlineare dei Manifold ", color="red")
+plt.grid()
+plt.show()
+```
+
+I punti $A(0,0)$, $B(0,2)$, $C(\frac{3}{2},0)$ e $D(1,1)$ risultano essere **eteroclini**: i manifold instabili che partono dai punti A, B e C si congiungono ai manifold stabili del punto D.
+
+<br>
+
+<br>
+
+#### *Traiettorie al variare delle condizioni iniziali*
+
+Le soluzioni al variare dei valori iniziali ed il campo vettoriale di questo sistema saranno:
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-2*x-1*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3/2, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(1, 1, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("Soluzioni al variare delle Condizioni Iniziali", color="red")
+plt.grid()
+
+plt.show()
+```
+
+Analizzando il sistema dal punto di vista dei conigli e delle pecore, sembra che, per qualsiasi condizione iniziale che non abbia una delle componenti x o y nulle, si arrivi ad uno stato di equilibrio tra le due specie (cioé il nodo stabile $(1,1)$).
+
+<br>
+
+<br>
+
+#### *Cosa succede al variare di a,b nell'intervallo (1,3)?*
+
+Per valutare come cambi la natura dei punti fissi, si può fare prima di tutto una piccola analisi analitica, considerando le jacobiane nei punti fissi del sistema in cui a e b sono due valori generici:
+
+$$
+\begin{split} \dot{x} &=x(3-ax-by) \\ \dot{y} & = y(2-x-y) \end{split}
+$$
+
+$$J=\begin{bmatrix}3-2ax-y &-bx \\ -y &2-2y-x \end{bmatrix}$$
+
+<br>
+
+I punti fissi di questo sistema sono quattro, $A(0,0)$, $B(0,2)$, $C(\frac{3}{a},0)$ e $D(\frac{2b-3}{b-a},\frac{3-2a}{b-a})$; considerando le rispettive jacobiane si possono fare un paio di osservazioni preliminari:
+
+-   Il punto $B$ dipende dai valori che assume la costante b e risulta essere:
+
+    -   un punto di sella se $b< \frac{3}{2}$
+
+    -   se $b=\frac{3}{2}$ si ha un caso di neutralità (uno degli autovalori è nullo)
+
+    -   negli altri casi è un nodo stabile (come nel caso di *rabbits vs sheeps* del libro di Strogatz)
+
+-   Il punto $C$ dipende invece dal valore che assume a e risulta essere:
+
+    -   un punto di sella se $a> \frac{3}{2}$
+
+    -   se $a=\frac{3}{2}$ si ha un caso di neutralità (uno degli autovalori è nullo)
+
+    -   negli altri casi è un nodo stabile (come nel caso di *rabbits vs sheeps* del libro di Strogatz)
+
+-   Il punto $D$ dipende dai valori assunti sia da a che da b, quindi è più difficile studiarne la natura analiticamente. Tuttavia si può osservare che se $a=b$, il nodo non compare (il denominatore si annullerebbe!) ma nel caso $a=b=\frac{3}{2}$, la jacobiana è la matrice nulla: questo fa sospettare il caso di un nodo degenere.
+
+<br>
+
+Dopo quest'analisi sulle jacobiane, si considerano alcuni valori particolari di a e b:
+
+-   $1 < a < \frac{3}2$ e $1 < b < \frac{3}2$:
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-1.1*x-1.4*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 2.5)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+###############
+
+initial_time = 0
+final_time = 20
+initial_value = (0.03, 0.095)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3/1.1, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot((2*1.4)/(1.4-1.1), (3-2*1.1)/(1.4-1.1), marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("a=1.1, b=1.4", color="red")
+plt.grid()
+
+plt.show()
+```
+
+Il punto B è un punto di sella, il nodo C è un nodo stabile. Sembra che il nodo D sia "collassato" sul punto C.
+
+Dal punto di vista dei conigli e delle pecore, sembra che, a meno che la componente x non sia nulla, si finisca sempre nella situazione in cui prevalgono i conigli.
+
+<br>
+
+-   $\frac{3}{2} < a < 3$ e $1 < b < \frac{3}2$ (che è simile al caso considerato)
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-2*x-1.1*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 2.5)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+###############
+
+initial_time = 0
+final_time = 20
+initial_value = (0.03, 0.095)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3/2, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot((2*1.1-3)/(1.1-2), (3-2*2)/(1.1-2), marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("a=2, b=1.1", color="red")
+plt.grid()
+
+plt.show()
+```
+
+I punti B e C sono due punti di sella, mentre il punto D è il nodo stabile a cui le orbite convergono.
+
+<br>
+
+-   $\frac{3}{2} < a < 3$ e $\frac{3}{2} < b < 3$
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-1.75*x-2.25*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 2.5)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+###############
+
+initial_time = 0
+final_time = 20
+initial_value = (0.03, 0.095)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3/(1.75), 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot((2*2.25-3)/(2.25-1.75), (3-2*1.75)/(2.25-1.75), marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("a=1.75, b=2.25", color="red")
+plt.grid()
+plt.show()
+```
+
+Il punto B è un nodo stabile mentre il punto C è un punto di sella. Sembra che il punto D sia "collassato" sul punto fisso B.
+
+Dal punto di vista di conigli e pecore, sembra che, per qualsiasi condizione iniziale che non abbia componente y nulla, prevalgano le pecore.
+
+<br>
+
+-   $1 < a < \frac{3}{2}$ e $\frac{3}{2} < b < 3$ (che è il caso *rabbits vs sheeps* del libro di Strogatz)
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-1*x-2*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 2.5)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+###############
+
+initial_time = 0
+final_time = 20
+initial_value = (0.03, 0.095)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(3, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(1,1, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("a=1, b=2", color="red")
+plt.grid()
+
+plt.show()
+```
+
+Si può osservare che i punti B e C sono nodi stabili, mentre il punto D è un punto di sella.
+
+Dal punto di vista delle due popolazioni, si può osservare come le soluzioni si dividano in due zone divise dai manifold del punto di sella; in alcuni casi possono prevalere i conigli, in altri le pecore.
+
+<br>
+
+-   $a = b = \frac{3}{2}$
+
+```{python, echo=FALSE, message=FALSE, results='hide'}
+plt.clf()
+def chosen_function(x, y, t=1):
+    function1 = x*(3-(3/2)*x-(3/2)*y)
+    function2 = y*(2-x-y)
+    return function1, function2
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.03)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#####
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+######
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+####
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+#######
+
+
+initial_time = 0
+final_time = 20
+initial_value = (5, 1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.05, 0.01)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.004, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.07)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.01, 0.09)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+initial_time = 0
+final_time = 20
+initial_value = (0.001, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (0.002, 0.1)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+#################
+
+initial_time = 0
+final_time = 20
+initial_value = (2, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (3, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (4, 3/2)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+################
+
+initial_time = 0
+final_time = 20
+initial_value = (1, 4)
+delta_time = 0.01
+
+time, x, y = euler_method_2d(initial_time, final_time, initial_value, delta_time)
+
+plt.plot(x,y, color="lightgreen")
+
+
+plt.plot([0, 2],[2,0], color="red")
+plt.plot(0, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(0, 2, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+plt.plot(2, 0, marker=".", markersize=10, markeredgecolor="red", markerfacecolor="red")
+
+
+
+plt.xlim(-0.1, 4)
+plt.ylim(-0.1, 4)
+
+plt.title("a=b=3/2", color="red")
+plt.grid()
+
+plt.show()
+```
+
+In B e C si ha una situazione di neutralità (una direzione di ciascuna è neutra) mentre il punto fisso D non è più visibile.
+
+<br>
+
+<br>
+
+<hr>
+
+##### Per quanto riguarda il codice utilizzato...
+
+L'analisi numerica è stata possibile grazie a Python ed in particolare alle librerie **numpy** per l'ottimizzazione computazionale, **matplotlib.pyplot** per i plot dei grafici.
+
+Per la simulazione numerica sono stati usati l'algoritmo di Eulero, Eulero modificato e Runge-Kutta riportati qua sotto:
+
+```{python,message=FALSE, results='hide'}
+def euler_method_2d(initial_time, final_time, initial_value, delta_time, modified=False):
+    time = initial_time
+    result1 = initial_value[0]
+    result2 = initial_value[1]
+    elements = round((final_time - initial_time)/delta_time)
+    
+    time_vector = np.empty(elements)
+    result1_vector = np.empty(elements)
+    result2_vector = np.empty(elements)
+
+    
+    for i in range(elements):
+        time_vector[i] = time
+        result1_vector[i] = result1
+        result2_vector[i] = result2
+        
+        time += delta_time
+
+        if modified:
+            fake_result1 = chosen_function(result1, result2, time)[0]*delta_time + result1
+            result1 += (chosen_function(result1, result2, time)[0]+chosen_function(fake_result1, result2, time)[0])*delta_time/2
+            
+            fake_result2 = chosen_function(result1, result2, time)[1]*delta_time + result2
+            result2 += (chosen_function(result1, result2, time)[1]+chosen_function(result1, fake_result2, time)[1])*delta_time/2
+        else:
+            result1 += chosen_function(result1, result2, time)[0]*delta_time
+            result2 += chosen_function(result1, result2, time)[1]*delta_time
+     
+        
+    return time_vector, result1_vector, result2_vector
+```
+
+```{python,message=FALSE, results='hide'}
+def runge_kutta_method(initial_time, final_time, initial_value, delta_time):
+    time = initial_time
+    result = initial_value
+    elements = round((final_time - initial_time)/delta_time)
+    
+    time_vector = np.empty(elements)
+    result_vector = np.empty(elements)
+
+    for i in range(elements):
+        time_vector[i] = time
+        result_vector[i] = result
+        
+        time += delta_time
+
+        fake_results_1 = chosen_function(result, time)*delta_time
+        fake_results_2 = chosen_function(result+0.5*fake_results_1, time)*delta_time
+        fake_results_3 = chosen_function(result+0.5*fake_results_2, time)*delta_time
+        fake_results_4 = chosen_function(result+fake_results_3, time)*delta_time
+        result += (fake_results_1+ 2*fake_results_2+ 2*fake_results_3+ fake_results_4)/6
+    
+    
+    return time_vector, result_vector
+```
